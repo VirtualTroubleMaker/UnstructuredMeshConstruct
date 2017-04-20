@@ -2,9 +2,7 @@
 #include <fstream>
 #include <algorithm>
 #include <string>
-#include "./Header/Mesh_2D.h"
-#include "./Header/MeshDeclaration.h"
-#include "./Header/MeshConstructFunc.h"
+#include "../Header/MeshConstructFunc.h"
 
 using std::cout;
 using std::cin;
@@ -29,7 +27,7 @@ int StringToHex(size_t* const &ptrHexLine, istringstream &iss_line,size_t &count
 	string str[MeshPerLine];
 	for(;iss_line >> str[count];++count);
 	if(0 == count) return 0;
-	#ifndef NDEBUG
+	#ifdef _ZERO_NDEBUG_FLIP
 		cout << count << endl;
 		for(int i = 0;i != count;++i)
 			cout << str[i] << " ";
@@ -38,7 +36,7 @@ int StringToHex(size_t* const &ptrHexLine, istringstream &iss_line,size_t &count
 
 	for(int i = 0;i != count; ++i)
 		ptrHexLine[i] = stoi(str[i],nullptr,16);
-	#ifndef NDEBUG
+	#ifdef _ZERO_NDEBUG_FLIP
 		for(int i = 0;i != count;++i)
 			cout << ptrHexLine[i] << " ";
 		cout << endl;
@@ -74,15 +72,13 @@ void BodyProcess(const size_t &index,size_t &FaceCount,
 		system("pause");
 	}
 }
-int MeshConstruct()
+int MeshConstruct(const string &s)
 {
 	size_t *ptrHexLine = new size_t[MeshPerLine];
 	size_t line = 0, count = 0, index = 0,body = 0,FaceCount = 0;
 	string string_line;
 	ifstream InFile_Mesh;
-	InFile_Mesh.open("./Mesh/hybrid_square_periodic_BCs_5_5.cas");
-	//InFile_Mesh.open("./Mesh/Cartesian_square_periodic_BCs_5_5.cas");
-	//InFile_Mesh.open("./Mesh/hybrid_square_Wall_BCs_3_3.cas");
+	InFile_Mesh.open("../Mesh/"+ s +".cas");
 	if(!InFile_Mesh)
 	{
 		cout << "file open failed  " <<__FILE__ <<" : "<<__LINE__<<"  "<<__func__<<endl; 
@@ -119,19 +115,39 @@ int MeshConstruct()
 	delete []ptrHexLine;
 	return 0;
 }
+
 int MeshCheck()
 {
 	for(size_t i = 0;i != Faces;++i)
 	{
-		#ifndef NDEBUG
+		#ifdef _ZERO_NDEBUG_FLIP
 		if(i%StepControl == 0)
+		if(FaceArray[i].bc_type != 12 &&  FaceArray[i].bc_type != 8)
 		cout << "FaceArray : " << i <<"   bc_type : " << FaceArray[i].bc_type <<std::hex
 			 <<"  "<< MeshIndex(FaceArray[i].NodeX_F[0] , NodeX)
 			 <<"  "<< MeshIndex(FaceArray[i].NodeX_F[1] , NodeX)
 			 <<"  "<< MeshIndex(FaceArray[i].lhsCell , CellArray)
 			 <<"  "<< MeshIndex(FaceArray[i].rhsCell , CellArray)<< std::dec <<endl;
+		else
+		cout << "FaceArray : " << i <<"   bc_type : " << FaceArray[i].bc_type <<std::hex
+			 <<"  "<< MeshIndex(FaceArray[i].NodeX_F[0] , NodeX)
+			 <<"  "<< MeshIndex(FaceArray[i].NodeX_F[1] , NodeX)
+			 <<"  "<< MeshIndex(FaceArray[i].lhsCell , CellArray)
+			 <<"  "<< MeshIndex(FaceArray[i].rhsCell->ShadowC , CellArray)<< std::dec <<endl;	
 		#endif
-		if(2 == FaceArray[i].bc_type || 12 == FaceArray[i].bc_type)
+		#ifdef _QUAD_PERIODIC_FLIP
+		if(FaceArray[i].Vx * FaceArray[i].Vy != 0.0)
+		{
+			cout << "FaceArray : " << i <<" Vx : " << FaceArray[i].Vx
+				 <<" Vx : " << FaceArray[i].Vy <<" Area: "
+				 <<std::setiosflags(ios::scientific) <<std::setprecision(16)
+				 <<FaceArray[i].Area
+				 <<std::resetiosflags(ios::scientific) <<std::setprecision(6)
+				 << endl;
+			system("pause");
+		}
+		#endif
+		if(2 == FaceArray[i].bc_type)
 		{
 			if(FaceArray[i].lhsCell == nullptr || FaceArray[i].rhsCell == nullptr)
 			{
@@ -139,9 +155,9 @@ int MeshCheck()
 					 <<"Cell = -1" << endl;
 				system("pause");
 			}
-			if(FaceArray[i].shadow != nullptr)
+			if(FaceArray[i].shadowF != nullptr)
 			{
-				cout<<"construct shadow faces for 2 or 12"<< endl;
+				cout<<"construct shadow faces for interior faces"<< endl;
 				system("pause");
 			}
 		}
@@ -153,13 +169,13 @@ int MeshCheck()
 					 <<"lhsCell == nullptr || rhsCell != nullptr" << endl;
 				system("pause");
 			}
-			if(FaceArray[i].shadow != nullptr)
+			if(FaceArray[i].shadowF != nullptr)
 			{
 				cout<<"constructed shadow faces for wall boundaries"<< endl;
 				system("pause");
 			}
 		}
-		else if(8 == FaceArray[i].bc_type)
+		else if(8 == FaceArray[i].bc_type || 12 == FaceArray[i].bc_type)
 		{
 			if(FaceArray[i].lhsCell == nullptr || FaceArray[i].rhsCell == nullptr)
 			{
@@ -167,9 +183,9 @@ int MeshCheck()
 					 <<"Cell = -1" << endl;
 				system("pause");
 			}
-			if(FaceArray[i].shadow == nullptr)
+			if(FaceArray[i].shadowF == nullptr)
 			{
-				cout<<"Failed to construct shadow faces for 8"<< endl;
+				cout<<"Failed to construct shadowF faces for 8 & 12"<< endl;
 				system("pause");
 			}
 		}
@@ -179,18 +195,15 @@ int MeshCheck()
 			system("pause");
 		}
 	}
-	#ifndef NDEBUG
-	for(size_t i = 0;i != Faces;++i)
-	{
-		if(i%StepControl == 0)
-		cout << "FaceArray : " << i <<" bc_type : " << FaceArray[i].bc_type
-					 <<"  shadow : "<< std::hex 
-					 <<MeshIndex(FaceArray[i].shadow , FaceArray)<< std::dec << endl;
-	}
-	#endif
 	cout <<"Face Check Done" <<endl;
 	for(size_t i = 0;i < Cells;++i)
 	{
+		if(nullptr != CellArray[i].ShadowC)
+		{
+			cout <<"CellArray : " << i <<endl;
+			cout <<"  "<<__FILE__<<"  "<<__LINE__<<"  "<<__func__<<endl;
+			system("pause");
+		}
 		if(3 == CellArray[i].celltype)
 		{
 			for(int k = 0;k != NumPerCell;++k)
@@ -251,10 +264,11 @@ int MeshCheck()
 	cout <<"Cell Check Done" <<endl;
 	return 0;
 }
-int MeshOutput()
+int MeshOutput(const string& s)
 {
+	cout << "Mesh output verifing..."<<endl;
 	ofstream OutFile_Mesh;
-	OutFile_Mesh.open("./MeshOutPut/hybrid_square_periodic_BCs_5_5.plt");
+	OutFile_Mesh.open("../MeshOutPut/"+ s +".plt");
 	if(!OutFile_Mesh)
 	{
 		cout << __FILE__ <<"  " << __func__ <<"  " << __LINE__ 
@@ -291,14 +305,14 @@ int MeshOutput()
 	}
 	cout <<"Mesh Output Done" <<endl;
 	OutFile_Mesh.close();
-//
+	cout <<"Face Output verifing..."<<endl;
 	ofstream OutFile_Face;
-	OutFile_Face.open("./MeshOutPut/13_hybrid_square_periodic_BCs_5_5.dat");
+	OutFile_Face.open("../MeshOutPut/13_" + s + ".dat");
 	if(!OutFile_Face)
 	{
 		cout << __FILE__ <<"  " << __func__ <<"  " << __LINE__ 
 			 <<"  "<<"file open failed" << endl; 
-		return -99999;
+		system("pause");
 	}
 	OutFile_Face << std::hex;
 	for(size_t i = 0;i != Faces;++i)
@@ -310,50 +324,35 @@ int MeshOutput()
 	}
 	OutFile_Face.close();
 //
-	OutFile_Face.open("./MeshOutPut/18_hybrid_square_periodic_BCs_5_5.dat");
+	OutFile_Face.open("../MeshOutPut/18_" + s +".dat");
 	if(!OutFile_Face)
 	{
 		cout << __FILE__ <<"  " << __func__ <<"  " << __LINE__ 
 			 <<"  "<<"file open failed" << endl; 
-		return -99999;
+		system("pause");
 	}
 	OutFile_Face << std::hex;
 	for(size_t i = 0;i != Faces;++i)
 	{
 		if(8 == FaceArray[i].bc_type)
-		OutFile_Face << MeshIndex(FaceArray[i].shadow , FaceArray)<<" "
+		OutFile_Face << MeshIndex(FaceArray[i].shadowF , FaceArray)<<" "
 					 << i + 1 <<endl;
 	}
 	OutFile_Face.close();
-	return 0;
-}
-int MeshComplementary()
-{
-	cout << "Traversing Faces : " << endl;
-	for(size_t i = 0;i != Faces;++i)
+	ofstream OutFile_Node;
+	OutFile_Node.open("../MeshOutPut/10_" + s + ".dat");
+	if(!OutFile_Node)
 	{
-		FaceArray[i].SetArea();
-		FaceArray[i].SetNormalV();
-		#ifndef NDEBUG
-		if(i%StepControl == 0)
-		cout <<"Face : "<<i<<" "<<std::setiosflags(ios::scientific)<<std::setprecision(6)
-			 <<FaceArray[i].xc <<" "<<FaceArray[i].yc<<" "
-		     <<FaceArray[i].Area <<" "<<FaceArray[i].Vx<<" "<<FaceArray[i].Vy
-		     <<resetiosflags(ios::scientific)<<endl;
-		#endif
+		cout << __FILE__ <<"  " << __func__ <<"  " << __LINE__ 
+			 <<"  "<<"file open failed" << endl; 
+		system("pause");
 	}
-	cout << "SetArea Done, SetNormalV Done" <<endl;
-	cout << "Traversing Cells : " << endl;
-	for(size_t i = 0;i != Cells;++i)
+	for(size_t i = 0;i != Nodes;++i)
 	{
-		CellArray[i].SetVolume();
-		#ifndef NDEBUG
-		if(i%StepControl == 0)
-		cout <<"Cell : "<<i<<" "<<std::setiosflags(ios::scientific)<<std::setprecision(6)
-		 	 <<CellArray[i].xc <<" "<<CellArray[i].yc<<" "<< CellArray[i].volume
-		 	 <<resetiosflags(ios::scientific)<<endl;
-		#endif
+		OutFile_Node <<std::setiosflags(ios::scientific) <<std::setprecision(16)
+					 <<NodeX[i]<<"  "<<NodeY[i] << endl;
 	}
-	cout << "SetVolume Done" <<endl;
+	OutFile_Node.close();
+	cout <<"Face Output Done"<<endl;
 	return 0;
 }
